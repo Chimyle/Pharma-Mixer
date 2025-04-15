@@ -2,6 +2,7 @@
 #include "I2CKeyPad.h"
 #include <LiquidCrystal_I2C.h>
 #include <RTClib.h>
+#define LED_BUILTIN 1
 
 // I2C Addresses
 const uint8_t KEYPAD_ADDRESS = 0x20;
@@ -206,7 +207,7 @@ void Reset() {
 
   // Reset display fields only (no full clear)
   lcd.setCursor(0, 0);
-  lcd.print("Duration: ");
+  lcd.print("Timer:         ");
   lcd.setCursor(8, 0);
   lcd.print("__:__  ");
   lcd.setCursor(0, 1);
