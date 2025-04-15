@@ -36,10 +36,7 @@ void setup() {
     while (1);
   }
 
-  lcd.setCursor(0, 0);
-  lcd.print("Enter MMSS Time:");
-  lcd.setCursor(15, 0);
-  lcd.print("_:_");  // initial placeholder
+  Reset();
 }
 
 void loop() {
@@ -48,19 +45,26 @@ void loop() {
     keyChange = false;
 
     if (index < 16) {
-      InputTimer(index);  // Pass the index to InputTimer function
-    } else if (keys[index] == '#') {  // Corrected: used keys[index] instead of undefined `key`
-      if (timeBuffer.length() == 4) {
-        mins = timeBuffer.substring(0, 2).toInt();
-        secs = timeBuffer.substring(2, 4).toInt();
-        SelectRPM();
-      } else {
-        lcd.setCursor(11, 0);
-        lcd.print("INVALID INPUT");
-        delay(2000);
-        timeBuffer = "";
-        lcd.setCursor(11, 0);
-        lcd.print("__:__");
+      char key = keys[index];
+
+      if (key == '#') {
+        if (timeBuffer.length() == 4) {
+          mins = timeBuffer.substring(0, 2).toInt();
+          secs = timeBuffer.substring(2, 4).toInt();
+          SelectRPM();
+        } else {
+          lcd.setCursor(0, 0);
+          lcd.print("INVALID");
+          delay(2000);
+          Reset();
+        }
+      } 
+      else if (key == '*') {
+        Reset();
+      } 
+      else {
+        // Let InputTimer handle filtering and display
+        InputTimer(index);
       }
     }
   }
@@ -81,16 +85,13 @@ void InputTimer(int index) {
     while (displayTime.length() < 4) displayTime += "_";
     String formatted = displayTime.substring(0, 2) + ":" + displayTime.substring(2, 4);
 
-    // Display on top row, starting at col 11 (for the time part)
-    lcd.setCursor(11, 0);
+    // Display on top row, starting at col 8 (for MM:SS)
+    lcd.setCursor(8, 0);
     lcd.print(formatted);
   }
 }
 
-void SelectRPM() {
-  lcd.setCursor(0, 1);
-  lcd.print("Select RPM: ");
-  
+void SelectRPM() {  
   while (true) {
     if (keyChange) {
       uint8_t index = keyPad.getKey();
@@ -101,32 +102,66 @@ void SelectRPM() {
       switch (key) {
         case 'A':
           Setpoint = 600;
-          lcd.setCursor(0, 1);
-          lcd.print("Select RPM: 600     ");
           break;
         case 'B':
           Setpoint = 1200;
-          lcd.setCursor(0, 1);
-          lcd.print("Select RPM:: 1200    ");
           break;
         case 'C':
           Setpoint = 1800;
-          lcd.setCursor(0, 1);
-          lcd.print("Select RPM: 1800    ");
           break;
         case 'D':
           Setpoint = 2400;
-          lcd.setCursor(0, 1);
-          lcd.print("Select RPM: 2400    ");
           break;
         case '#':
           RunMotor();
-          return;  // Exit the loop and return to main loop
+          return;
+        case '*':
+          Reset();
+          return;
+        default:
+          continue;  // ignore other keys
       }
+
+      // Clear only the RPM value area (column 8 to 12)
+      lcd.setCursor(8, 1);
+      lcd.print("     ");  // 5 spaces to clear old value
+      lcd.setCursor(8, 1);
+      lcd.print(Setpoint);
     }
   }
 }
 
 void RunMotor(){
-  
+  while (rtc.now() < endTime){
+    if (keyChange){
+      PWM = 0;
+      keyChange = false;
+      break;
+    }  
+    lcd.setCursor(0, 0);
+    lcd.print("Time Remaining:");
+    lcd.setCursor(0, 1);
+    lcd.print(endTime - rtc.now());
+  }
+}
+
+void Reset() {
+  // Clear variables
+  timeBuffer = "";
+  mins = 0;
+  secs = 0;
+  Setpoint = 0;
+
+  // Clear and reset LCD
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Duration:");
+  lcd.setCursor(8, 0);  // position where MM:SS is shown
+  lcd.print("__:__");
+  lcd.setCursor(0, 1);
+  lcd.print("RPM:");
+
+
+  // Reset keyChange flag in case it was still true
+  keyChange = false;
 }
