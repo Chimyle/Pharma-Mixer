@@ -28,8 +28,9 @@ void keyChanged() {
 }
 
 void setup() {
+  pinMode(LED_BUILTIN, OUTPUT);
   pinMode(3, INPUT_PULLUP);
-  attachInterrupt(1, keyChanged, FALLING);
+  attachInterrupt(1, keyChanged, FALLING); //Check interrupt pin
   keyChange = false;
 
   Wire.begin();
@@ -44,7 +45,7 @@ void setup() {
     lcd.print("RTC not found!");
     while (1);
   }
-
+  
   if (!keyPad.begin()) {
     lcd.setCursor(0, 0);
     lcd.print("Keypad ERROR!");
@@ -156,13 +157,14 @@ void SelectRPM() {
 void RunMotor() {
   lcd.setCursor(0, 0);
   lcd.print("Time Remaining:");
+  digitalWrite(LED_BUILTIN, HIGH);  // Turn on LED during motor run
 
   while (rtc.now() < endTime) {
     if (keyChange) {
-      //PWM = 0;
       keyChange = false;
+      digitalWrite(LED_BUILTIN, LOW);  // Turn off LED before exit
       Reset();
-      break;
+      return;
     }
 
     DateTime now = rtc.now();
@@ -176,12 +178,24 @@ void RunMotor() {
     lcd.setCursor(0, 1);
     lcd.print(buffer);
 
-    delay(500);  // Lightweight delay for readability
+    delay(500);
   }
 
+  digitalWrite(LED_BUILTIN, LOW);  // Turn off LED after timer ends
   lcd.setCursor(0, 1);
   lcd.print("Done!           ");
+
+  // Wait for any key to be pressed before Reset
+  while (true) {
+    if (keyChange) {
+      keyChange = false;
+      Reset();
+      return;
+    }
+  }
 }
+
+
 
 void Reset() {
   // Clear variables
