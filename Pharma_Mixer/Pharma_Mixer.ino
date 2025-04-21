@@ -6,7 +6,7 @@
 
 // I2C Addresses
 const uint8_t KEYPAD_ADDRESS = 0x20;
-LiquidCrystal_I2C lcd(0x27, 16, 2);  // Adjust if needed
+LiquidCrystal_I2C lcd(0x27, 20, 4);  // Adjust if needed
 I2CKeyPad keyPad(KEYPAD_ADDRESS);
 RTC_DS3231 rtc;
 
@@ -42,13 +42,13 @@ void setup() {
 
   if (!rtc.begin()) {
     lcd.clear();
-    lcd.setCursor(0, 0);
+    lcd.setCursor(0, 1);
     lcd.print("RTC not found!");
     while (1);
   }
   
   if (!keyPad.begin()) {
-    lcd.setCursor(0, 0);
+    lcd.setCursor(0, 1);
     lcd.print("Keypad ERROR!");
     while (1);
   }
@@ -73,7 +73,7 @@ void loop() {
           secs = timeBuffer.substring(2, 4).toInt();
           SelectRPM();
         } else {
-          lcd.setCursor(0, 0);
+          lcd.setCursor(0, 1);
           lcd.print("Invalid Time   ");
           delay(2000);
           Reset();
@@ -99,13 +99,13 @@ void InputTimer(int index) {
   while (displayTime.length() < 4) displayTime += "_";
   String formatted = displayTime.substring(0, 2) + ":" + displayTime.substring(2, 4);
 
-  lcd.setCursor(8, 0);
+  lcd.setCursor(8, 1);
   lcd.print(formatted);
 }
 
 void SelectRPM() {
-  lcd.setCursor(0, 1);
-  lcd.print("RPM:           ");  // Clear RPM line
+  lcd.setCursor(0, 2);
+  lcd.print(" RPM :           ");  // Clear RPM line
 
   while (true) {
     if (keyChange) {
@@ -117,37 +117,23 @@ void SelectRPM() {
       switch (key) {
         case 'A':
           Setpoint = 25;
-          lcd.setCursor(5, 1);
-          lcd.print("      "); // Clear old RPM
-          lcd.setCursor(5, 1);
-          lcd.print(Setpoint);
           break;
         case 'B':
           Setpoint = 40;
-          lcd.setCursor(5, 1);
-          lcd.print("      "); // Clear old RPM
-          lcd.setCursor(5, 1);
-          lcd.print(Setpoint);
           break;
         case 'C':
           Setpoint = 70;
-          lcd.setCursor(5, 1);
-          lcd.print("      "); // Clear old RPM
-          lcd.setCursor(5, 1);
-          lcd.print(Setpoint);
           break;
         case 'D':
           Setpoint = 90;
-          lcd.setCursor(5, 1);
-          lcd.print("      "); // Clear old RPM
-          lcd.setCursor(5, 1);
-          lcd.print(Setpoint);
           break;
         case '#':
-          if (mins > 0 || secs > 0) {
-            endTime = rtc.now() + TimeSpan(0, 0, mins, secs);
-            RunMotor();
-            return;
+          if (Setpoint > 0){
+            if (mins > 0 || secs > 0) {
+              endTime = rtc.now() + TimeSpan(0, 0, mins, secs);
+              RunMotor();
+              return;
+            }
           }
           break;
         case '*':
@@ -155,13 +141,22 @@ void SelectRPM() {
           return;
           break;
       }
+
+      if (Setpoint > 0) {
+        lcd.setCursor(8, 2);
+        lcd.print("      "); // Clear old RPM
+        lcd.setCursor(8, 2);
+        lcd.print(Setpoint);
+      }
     }
   }
 }
 
 void RunMotor() {
-  lcd.setCursor(0, 0);
+  lcd.setCursor(0, 1);
   lcd.print("Time Remaining:");
+  lcd.setCursor(0, 3);
+  lcd.print("   Any Key - STOP   ");
   digitalWrite(LED_BUILTIN, LOW);  // Turn on LED during motor run
 
   while (rtc.now() < endTime) {
@@ -178,17 +173,19 @@ void RunMotor() {
     char buffer[9];
     snprintf(buffer, sizeof(buffer), "%02d:%02d:%02d", remaining.hours(), remaining.minutes(), remaining.seconds());
 
-    lcd.setCursor(0, 1);
+    lcd.setCursor(0, 2);
     lcd.print("                ");
-    lcd.setCursor(0, 1);
+    lcd.setCursor(0, 2);
     lcd.print(buffer);
 
-    delay(250);
+    delay(50);
   }
 
   digitalWrite(LED_BUILTIN, HIGH);  // Turn off LED after timer ends
-  lcd.setCursor(0, 1);
-  lcd.print("Done!           ");
+  lcd.clear();
+  lcd.print("  {MIXER  CONTROL}  ");
+  lcd.setCursor(0, 2);
+  lcd.print("Done! Press to Reset");
 
   // Wait for any key to be pressed before Reset
   while (true) {
@@ -212,9 +209,13 @@ void Reset() {
 
   // Reset display fields only (no full clear)
   lcd.clear();
+  lcd.print("  {MIXER  CONTROL}  ");
+  lcd.setCursor(0, 1);
   lcd.print("Timer:         ");
-  lcd.setCursor(8, 0);
-  lcd.print("__:__  ");
+  lcd.setCursor(8, 1);
+  lcd.print("MM:SS  ");
+  lcd.setCursor(0, 3);
+  lcd.print("   *-CLEAR   #-OK   ");
 
   keyChange = false;
 }
