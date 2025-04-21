@@ -116,28 +116,28 @@ void SelectRPM() {
 
       switch (key) {
         case 'A':
-          Setpoint = 600;
+          Setpoint = 25;
           lcd.setCursor(5, 1);
           lcd.print("      "); // Clear old RPM
           lcd.setCursor(5, 1);
           lcd.print(Setpoint);
           break;
         case 'B':
-          Setpoint = 1200;
+          Setpoint = 40;
           lcd.setCursor(5, 1);
           lcd.print("      "); // Clear old RPM
           lcd.setCursor(5, 1);
           lcd.print(Setpoint);
           break;
         case 'C':
-          Setpoint = 1800;
+          Setpoint = 70;
           lcd.setCursor(5, 1);
           lcd.print("      "); // Clear old RPM
           lcd.setCursor(5, 1);
           lcd.print(Setpoint);
           break;
         case 'D':
-          Setpoint = 2400;
+          Setpoint = 90;
           lcd.setCursor(5, 1);
           lcd.print("      "); // Clear old RPM
           lcd.setCursor(5, 1);
@@ -150,6 +150,10 @@ void SelectRPM() {
             return;
           }
           break;
+        case '*':
+          Reset();
+          return;
+          break;
       }
     }
   }
@@ -158,12 +162,12 @@ void SelectRPM() {
 void RunMotor() {
   lcd.setCursor(0, 0);
   lcd.print("Time Remaining:");
-  digitalWrite(LED_BUILTIN, HIGH);  // Turn on LED during motor run
+  digitalWrite(LED_BUILTIN, LOW);  // Turn on LED during motor run
 
   while (rtc.now() < endTime) {
     if (keyChange) {
       keyChange = false;
-      digitalWrite(LED_BUILTIN, LOW);  // Turn off LED before exit
+      digitalWrite(LED_BUILTIN, HIGH);  // Turn off LED before exit
       Reset();
       return;
     }
@@ -171,18 +175,18 @@ void RunMotor() {
     DateTime now = rtc.now();
     TimeSpan remaining = endTime - now;
 
-    char buffer[6];
-    snprintf(buffer, sizeof(buffer), "%02d:%02d", remaining.minutes(), remaining.seconds());
+    char buffer[9];
+    snprintf(buffer, sizeof(buffer), "%02d:%02d:%02d", remaining.hours(), remaining.minutes(), remaining.seconds());
 
     lcd.setCursor(0, 1);
     lcd.print("                ");
     lcd.setCursor(0, 1);
     lcd.print(buffer);
 
-    delay(500);
+    delay(250);
   }
 
-  digitalWrite(LED_BUILTIN, LOW);  // Turn off LED after timer ends
+  digitalWrite(LED_BUILTIN, HIGH);  // Turn off LED after timer ends
   lcd.setCursor(0, 1);
   lcd.print("Done!           ");
 
@@ -204,14 +208,13 @@ void Reset() {
   mins = 0;
   secs = 0;
   Setpoint = 0;
+  digitalWrite(LED_BUILTIN, HIGH);
 
   // Reset display fields only (no full clear)
-  lcd.setCursor(0, 0);
+  lcd.clear();
   lcd.print("Timer:         ");
   lcd.setCursor(8, 0);
   lcd.print("__:__  ");
-  lcd.setCursor(0, 1);
-  lcd.print("RPM:         ");
 
   keyChange = false;
 }
