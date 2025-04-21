@@ -3,7 +3,7 @@
 #include <RTClib.h>
 #define LED_BUILTIN 1
 
-LiquidCrystal_I2C lcd(0x27, 16, 2);
+LiquidCrystal_I2C lcd(0x27, 20, 4);
 RTC_DS3231 rtc;
 
 // Keypad setup
@@ -38,7 +38,7 @@ void setup() {
   lcd.backlight();
 
   if (!rtc.begin()) {
-    lcd.setCursor(0, 0);
+    lcd.setCursor(0, 1);
     lcd.print("RTC not found!");
     while (1);
   }
@@ -58,7 +58,7 @@ void loop() {
         secs = timeBuffer.substring(2, 4).toInt();
         SelectRPM();
       } else {
-        lcd.setCursor(0, 0);
+        lcd.setCursor(0, 1);
         lcd.print("Invalid Time   ");
         delay(2000);
         Reset();
@@ -81,13 +81,13 @@ void InputTimer(char key) {
   while (displayTime.length() < 4) displayTime += "_";
   String formatted = displayTime.substring(0, 2) + ":" + displayTime.substring(2, 4);
 
-  lcd.setCursor(8, 0);
+  lcd.setCursor(8, 1);
   lcd.print(formatted);
 }
 
 void SelectRPM() {
-  lcd.setCursor(0, 1);
-  lcd.print("RPM:           ");  // Clear RPM line
+  lcd.setCursor(0, 2);
+  lcd.print(" RPM :           ");  // Clear RPM line
 
   while (true) {
     char key = keypad.getKey();
@@ -121,9 +121,9 @@ void SelectRPM() {
       }
 
       if (Setpoint > 0) {
-        lcd.setCursor(5, 1);
+        lcd.setCursor(8, 2);
         lcd.print("      "); // Clear old RPM
-        lcd.setCursor(5, 1);
+        lcd.setCursor(8, 2);
         lcd.print(Setpoint);
       }
     }
@@ -131,8 +131,10 @@ void SelectRPM() {
 }
 
 void RunMotor() {
-  lcd.setCursor(0, 0);
+  lcd.setCursor(0, 1);
   lcd.print("Time Remaining:");
+  lcd.setCursor(0, 3);
+  lcd.print("   Any Key - STOP   ");
   digitalWrite(LED_BUILTIN, LOW);  // Turn on LED (active low)
 
   while (rtc.now() < endTime) {
@@ -150,17 +152,19 @@ void RunMotor() {
     snprintf(buffer, sizeof(buffer), "%02d:%02d:%02d", remaining.hours(), remaining.minutes(), remaining.seconds());
 
 
-    lcd.setCursor(0, 1);
+    lcd.setCursor(0, 2);
     lcd.print("                ");
-    lcd.setCursor(0, 1);
+    lcd.setCursor(0, 2);
     lcd.print(buffer);
 
-    delay(250);
+    delay(50);
   }
 
   digitalWrite(LED_BUILTIN, HIGH);  // Turn off LED after timer ends
-  lcd.setCursor(0, 1);
-  lcd.print("Done!           ");
+  lcd.clear();
+  lcd.print("  {MIXER  CONTROL}  ");
+  lcd.setCursor(0, 2);
+  lcd.print("Done! Press to Reset");
 
   // Wait for any key to be pressed before Reset
   while (true) {
@@ -178,9 +182,11 @@ void Reset() {
   Setpoint = 0;
 
   lcd.clear();
+  lcd.print("  {MIXER  CONTROL}  ");
+  lcd.setCursor(0, 1);
   lcd.print("Timer:         ");
-  lcd.setCursor(8, 0);
-  lcd.print("__:__  ");
-  //lcd.setCursor(0, 1);
-  //lcd.print("RPM:         ");
+  lcd.setCursor(8, 1);
+  lcd.print("MM:SS  ");
+  lcd.setCursor(0, 3);
+  lcd.print("   *-CLEAR   #-OK   ");
 }
