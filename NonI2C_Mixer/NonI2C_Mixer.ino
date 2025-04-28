@@ -150,9 +150,11 @@ void SelectRPM() {
 
 void RunMotor() {
   lcd.setCursor(0, 1);
-  lcd.print("Time Remaining:");
+  lcd.print("Time Left: ");
+  lcd.setCursor(0, 2);
+  lcd.print("Current RPM:        ");
   lcd.setCursor(0, 3);
-  lcd.print("   Any Key - STOP   ");
+  lcd.print("  *-PAUSE   #-STOP  ");
 
   digitalWrite(LED_BUILTIN, LOW);  // Turn on LED
   digitalWrite(ENA_PIN, LOW);      // Enable motor driver
@@ -164,10 +166,31 @@ void RunMotor() {
   while (rtc.now() < endTime) {
     char key = keypad.getKey();
     if (key) {
-      StopMotorPWM();
-      digitalWrite(ENA_PIN, HIGH); // Disable motor
-      Reset();
-      return;
+      switch (key) {
+        case '#':
+          StopMotorPWM();
+          digitalWrite(ENA_PIN, HIGH); // Disable motor
+          Reset();
+          return;
+          break;
+        case '*':
+          StopMotorPWM();
+          digitalWrite(ENA_PIN, HIGH); // Disable motor
+          DateTime now = rtc.now();
+          TimeSpan remaining = endTime - now;
+          lcd.setCursor(0, 2);
+          lcd.print("    -- PAUSED --    ");
+          while (true) {
+            endTime = rtc.now() + TimeSpan(0, remaining.hours(), remaining.minutes(), remaining.seconds());
+            if (keypad.getKey()) {
+              lcd.setCursor(0, 2);
+              lcd.print("RPM:                ");  
+              RunMotor();
+              return;
+            }
+          }
+          break;
+      }
     }
 
     if (millis() - lastUpdateLCD >= 200) {
@@ -196,13 +219,19 @@ void UpdateCountdownLCD() {
   DateTime now = rtc.now();
   TimeSpan remaining = endTime - now;
 
+  //Update Time
   char buffer[9];
   snprintf(buffer, sizeof(buffer), "%02d:%02d:%02d", remaining.hours(), remaining.minutes(), remaining.seconds());
 
-  lcd.setCursor(0, 2);
-  lcd.print("                ");
-  lcd.setCursor(0, 2);
+  lcd.setCursor(11, 1);
+  lcd.print("         ");
+  lcd.setCursor(12, 1);
   lcd.print(buffer);
+  //Update RPM
+  lcd.setCursor(13, 2);
+  lcd.print("      ");
+  lcd.setCursor(13, 2);
+  lcd.print(Setpoint);
 }
 
 void Reset() {
