@@ -1,7 +1,16 @@
 #include <Keypad.h>
 #include <LiquidCrystal_I2C.h>
 #include <RTClib.h>
+
 #define LED_BUILTIN 1
+#define PUL_PIN 33
+#define DIR_PIN 32
+#define ENA_PIN 35
+
+// PWM config
+#define PWM_CHANNEL 0
+#define PWM_RESOLUTION 8  // 8-bit resolution
+#define PWM_DUTY_CYCLE 127 // 50% duty cycle
 
 LiquidCrystal_I2C lcd(0x27, 20, 4);
 RTC_DS3231 rtc;
@@ -22,16 +31,25 @@ byte colPins[COLS] = {16, 4, 0, 2};    // C1-C4
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 
 // Time and control variables
-String timeBuffer = "";  // MMSS input buffer
+String timeBuffer = "";
 int mins = 0;
 int secs = 0;
 int Setpoint = 0;
 
 DateTime endTime;
 
+// Gear ratio constants
+const float gear_ratio = 60.0 / 14.0;
+
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, HIGH);  // Turn LED off (active low)
+  pinMode(PUL_PIN, OUTPUT);
+  pinMode(DIR_PIN, OUTPUT);
+  pinMode(ENA_PIN, OUTPUT);
+
+  digitalWrite(ENA_PIN, LOW);  // Enable motor driver
+  digitalWrite(DIR_PIN, HIGH); // Set default direction
 
   Wire.begin();
   lcd.init();
@@ -43,6 +61,7 @@ void setup() {
     while (1);
   }
 
+  SetupPWM();
   Reset();
 }
 
@@ -106,7 +125,7 @@ void SelectRPM() {
           Setpoint = 90;
           break;
         case '#':
-          if (Setpoint > 0){
+          if (Setpoint > 0) {
             if (mins > 0 || secs > 0) {
               endTime = rtc.now() + TimeSpan(0, 0, mins, secs);
               RunMotor();
@@ -117,12 +136,11 @@ void SelectRPM() {
         case '*':
           Reset();
           return;
-          break;
       }
 
       if (Setpoint > 0) {
         lcd.setCursor(8, 2);
-        lcd.print("      "); // Clear old RPM
+        lcd.print("      ");
         lcd.setCursor(8, 2);
         lcd.print(Setpoint);
       }
@@ -135,44 +153,56 @@ void RunMotor() {
   lcd.print("Time Remaining:");
   lcd.setCursor(0, 3);
   lcd.print("   Any Key - STOP   ");
-  digitalWrite(LED_BUILTIN, LOW);  // Turn on LED (active low)
+
+  digitalWrite(LED_BUILTIN, LOW);  // Turn on LED
+  digitalWrite(ENA_PIN, LOW);      // Enable motor driver
+
+  unsigned long lastUpdateLCD = 0;
+
+  SetMotorPWM(Setpoint); // Start PWM based on selected RPM
 
   while (rtc.now() < endTime) {
     char key = keypad.getKey();
     if (key) {
-      digitalWrite(LED_BUILTIN, HIGH);  // Turn off LED
+      StopMotorPWM();
+      digitalWrite(ENA_PIN, HIGH); // Disable motor
       Reset();
       return;
     }
 
-    DateTime now = rtc.now();
-    TimeSpan remaining = endTime - now;
-
-    char buffer[9];
-    snprintf(buffer, sizeof(buffer), "%02d:%02d:%02d", remaining.hours(), remaining.minutes(), remaining.seconds());
-
-
-    lcd.setCursor(0, 2);
-    lcd.print("                ");
-    lcd.setCursor(0, 2);
-    lcd.print(buffer);
-
-    delay(50);
+    if (millis() - lastUpdateLCD >= 200) {
+      lastUpdateLCD = millis();
+      UpdateCountdownLCD();
+    }
   }
 
-  digitalWrite(LED_BUILTIN, HIGH);  // Turn off LED after timer ends
+  StopMotorPWM();
+  digitalWrite(ENA_PIN, HIGH); // Disable motor
+
   lcd.clear();
   lcd.print("  {MIXER  CONTROL}  ");
   lcd.setCursor(0, 2);
   lcd.print("Done! Press to Reset");
 
-  // Wait for any key to be pressed before Reset
   while (true) {
     if (keypad.getKey()) {
       Reset();
       return;
     }
   }
+}
+
+void UpdateCountdownLCD() {
+  DateTime now = rtc.now();
+  TimeSpan remaining = endTime - now;
+
+  char buffer[9];
+  snprintf(buffer, sizeof(buffer), "%02d:%02d:%02d", remaining.hours(), remaining.minutes(), remaining.seconds());
+
+  lcd.setCursor(0, 2);
+  lcd.print("                ");
+  lcd.setCursor(0, 2);
+  lcd.print(buffer);
 }
 
 void Reset() {
@@ -189,4 +219,26 @@ void Reset() {
   lcd.print("MM:SS  ");
   lcd.setCursor(0, 3);
   lcd.print("   *-CLEAR   #-OK   ");
+}
+
+// PWM setup
+void SetupPWM() {
+  ledcSetup(PWM_CHANNEL, 1, PWM_RESOLUTION); // initial dummy freq
+  ledcAttachPin(PUL_PIN, PWM_CHANNEL);
+}
+
+void SetMotorPWM(int rpm_target) {
+  int steps_per_rev = 800; // Adjust if your driver uses microstepping
+  float motor_rpm = rpm_target * gear_ratio;
+  float revs_per_sec = motor_rpm / 60.0;
+  int pulse_freq = steps_per_rev * revs_per_sec;
+
+  if (pulse_freq < 1) pulse_freq = 1; // Prevent 0 frequency
+
+  ledcSetup(PWM_CHANNEL, pulse_freq, PWM_RESOLUTION);
+  ledcWrite(PWM_CHANNEL, PWM_DUTY_CYCLE);
+}
+
+void StopMotorPWM() {
+  ledcWrite(PWM_CHANNEL, 0); // No pulses
 }
