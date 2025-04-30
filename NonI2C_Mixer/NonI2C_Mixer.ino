@@ -39,7 +39,7 @@ int Setpoint = 0;
 DateTime endTime;
 
 // Gear ratio constants
-const float gear_ratio = 60.0 / 14.0;
+const float gear_ratio = 60.0 / 20.0;
 
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
