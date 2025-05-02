@@ -3,9 +3,11 @@
 #include <RTClib.h>
 
 #define LED_BUILTIN 1
-#define PUL_PIN 33
-#define DIR_PIN 32
-#define ENA_PIN 35
+#define PUL_PIN 25
+#define DIR_PIN 33
+#define ENA_PIN 32
+#define SENSOR_PIN 35
+#define SQW_PIN 26
 
 // PWM config
 #define PWM_CHANNEL 0
@@ -41,12 +43,37 @@ DateTime endTime;
 // Gear ratio constants
 const float gear_ratio = 60.0 / 20.0;
 
+//IR Sensor
+const float SampRate = 3.0; //RPM Calc interval in seconds
+const float PPR = 2.0; //Pulse per revolution of IR disc
+volatile unsigned long pulseCount = 0;
+volatile unsigned long calctimer = 0;
+portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
+
+volatile unsigned long lastPulseTime = 0;
+void IRAM_ATTR handlePulse() {
+  unsigned long now = micros();
+  if (now - lastPulseTime > 5000) {  // debounce: ignore pulses within 5ms
+    portENTER_CRITICAL_ISR(&mux);
+    pulseCount++;
+    portEXIT_CRITICAL_ISR(&mux);
+    lastPulseTime = now;
+  }
+}
+
+
+void IRAM_ATTR sqwISR() {
+  calctimer++;
+}
+
 void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, HIGH);  // Turn LED off (active low)
   pinMode(PUL_PIN, OUTPUT);
   pinMode(DIR_PIN, OUTPUT);
   pinMode(ENA_PIN, OUTPUT);
+  pinMode(SENSOR_PIN, INPUT);
+  attachInterrupt(digitalPinToInterrupt(SENSOR_PIN), handlePulse, FALLING);
 
   digitalWrite(ENA_PIN, LOW);  // Enable motor driver
   digitalWrite(DIR_PIN, HIGH); // Set default direction
@@ -60,6 +87,9 @@ void setup() {
     lcd.print("RTC not found!");
     while (1);
   }
+  rtc.writeSqwPinMode(DS3231_SquareWave1Hz);
+  pinMode(SQW_PIN, INPUT_PULLUP);
+  attachInterrupt(digitalPinToInterrupt(SQW_PIN), sqwISR, FALLING);
 
   SetupPWM();
   Reset();
@@ -228,10 +258,25 @@ void UpdateCountdownLCD() {
   lcd.setCursor(12, 1);
   lcd.print(buffer);
   //Update RPM
-  lcd.setCursor(13, 2);
-  lcd.print("      ");
-  lcd.setCursor(13, 2);
-  lcd.print(Setpoint);
+  if (calctimer >= SampRate) {
+    lcd.setCursor(13, 2);
+    lcd.print("      ");
+    lcd.setCursor(13, 2);
+    lcd.print(CalculateRPM());
+    calctimer = 0;
+  }
+}
+
+unsigned long CalculateRPM() {
+  // RPM calculation
+  unsigned long count;
+  portENTER_CRITICAL(&mux);
+  count = pulseCount;
+  pulseCount = 0;
+  portEXIT_CRITICAL(&mux);
+
+  unsigned long rpm = (count / PPR) * (60 / SampRate); 
+  return rpm;
 }
 
 void Reset() {
