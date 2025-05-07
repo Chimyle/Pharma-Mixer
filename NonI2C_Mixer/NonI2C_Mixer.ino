@@ -3,11 +3,11 @@
 #include <RTClib.h>
 
 #define LED_BUILTIN 1
-#define PUL_PIN 25
-#define DIR_PIN 33
-#define ENA_PIN 32
-#define SENSOR_PIN 35
-#define SQW_PIN 26
+#define PUL_PIN 33
+#define DIR_PIN 32
+#define ENA_PIN 35
+#define SENSOR_PIN 25
+#define SQW_PIN 34
 
 // PWM config
 #define PWM_CHANNEL 0
@@ -27,8 +27,11 @@ char keys[ROWS][COLS] = {
   {'*', '0', '#', 'D'}
 };
 
-byte rowPins[ROWS] = {19, 18, 5, 17};  // R1-R4
-byte colPins[COLS] = {16, 4, 0, 2};    // C1-C4
+byte rowPins[ROWS] = {2, 0, 4, 16};  // R1-R4
+byte colPins[COLS] = {17, 5, 18, 19};    // C1-C4
+
+// byte rowPins[ROWS] = {19, 18, 5, 17};  // R1-R4
+// byte colPins[COLS] = {16, 4, 0, 2};    // C1-C4
 
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 
@@ -45,7 +48,7 @@ const float gear_ratio = 60.0 / 20.0;
 
 //IR Sensor
 const float SampRate = 3.0; //RPM Calc interval in seconds
-const float PPR = 2.0; //Pulse per revolution of IR disc
+const float PPR = 12.0; //Pulse per revolution of IR disc encoder
 volatile unsigned long pulseCount = 0;
 volatile unsigned long calctimer = 0;
 portMUX_TYPE mux = portMUX_INITIALIZER_UNLOCKED;
@@ -212,11 +215,20 @@ void RunMotor() {
           lcd.print("    -- PAUSED --    ");
           while (true) {
             endTime = rtc.now() + TimeSpan(0, remaining.hours(), remaining.minutes(), remaining.seconds());
-            if (keypad.getKey()) {
-              lcd.setCursor(0, 2);
-              lcd.print("RPM:                ");  
-              RunMotor();
-              return;
+            char unpause = keypad.getKey();
+            if (unpause) {
+              if (unpause == '#'){
+                StopMotorPWM();
+                digitalWrite(ENA_PIN, HIGH); // Disable motor
+                Reset();
+                return;
+                break;
+              }else{
+                lcd.setCursor(0, 2);
+                lcd.print("RPM:                ");  
+                RunMotor();
+                return;
+              }
             }
           }
           break;
